@@ -1,5 +1,6 @@
 from flask import Flask, render_template,request
 from datetime import datetime
+import math
 
 app = Flask(__name__)
 
@@ -10,6 +11,7 @@ def index():
     link += "<a href=/cy>誠摯地自介</a><hr>"
     link += "<a href=/wc?u=Panco&d=靜宜大學&c=資訊管理導論>Get傳值</a><hr>"
     link += "<a href=/account>Post傳值</a><hr>"
+    link += "<a href=/calc>次方與根號計算</a><hr>"
     return link
     
 @app.route("/mis")
@@ -42,6 +44,22 @@ def account():
     else:
         return render_template("account.html")
 
-
+@app.route("/calc", methods=["GET", "POST"])
+def calc():
+    if request.method == "POST":
+        x = int(request.form["x"])
+        op = request.form["op"]
+        y = int(request.form["y"])
+        ans = 0
+        if op == "power":
+            ans = x ** y
+        elif op == "sqrt":
+            if y == 0:
+                ans = "y不能為0"
+            else:
+                ans = x ** (1/y)
+        return render_template("calculate.html", result = ans)
+    else:
+        return render_template("calculate.html", result = None)
 if __name__ == "__main__":
     app.run(debug=True)
