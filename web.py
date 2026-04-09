@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    link = "<h1>C-C-Yang個人首頁</h1>"
+    link = "<h1>C-C-Yang個人首頁2026/04/09</h1>"
     link += "<a href=/today>目前時間</a><hr>"
     link += "<a href=/cy>誠摯地自介</a><hr>"
     link += "<a href=/wc?u=Panco&d=靜宜大學&c=資訊管理導論>Get傳值</a><hr>"
@@ -55,7 +55,7 @@ def calc():
             ans = x ** y
         elif op == "sqrt":
             if y == 0:
-                ans = "y不能為0"
+                ans = "他媽數學白癡,y不能為0"
             else:
                 ans = x ** (1/y)
         return render_template("calculate.html", result = ans)
