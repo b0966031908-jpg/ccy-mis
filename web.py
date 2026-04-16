@@ -1,10 +1,15 @@
-from flask import Flask, render_template,request
-from datetime import datetime
 import math
 import os
 import json
+
+from flask import Flask, render_template,request
+from datetime import datetime
+
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+import requests
+from bs4 import BeautifulSoup
 
 # 判斷是在 Vercel 還是本地
 if os.path.exists('serviceAccountKey.json'):
@@ -29,8 +34,37 @@ def index():
     link += "<a href=/account>Post傳值</a><hr>"
     link += "<a href=/calc>次方與根號計算</a><hr>"
     link += "<a href=/read>讀取Firestore資料</a><hr>"
+    link += "<a href=/read2>讀取Firestore資料(根據姓名關鍵字)</a><hr>"
+    link += "<a href=/spider>爬取子青老師本學期課程</a><hr>"
     return link
-    
+
+@app.route("/spider")
+def spider():
+    R = ""
+    url = "https://www1.pu.edu.tw/~tcyang/course.html"
+    Data = requests.get(url, verify=False)
+    Data.encoding = "utf-8"
+    sp = BeautifulSoup(Data.text, "html.parser")
+    result=sp.select(".team-box a")
+    for i in result:
+        R += i.text + i.get("href") + "<br>"
+    return R
+
+@app.route("/read2")
+def read2():
+    Result = ""
+    keyword = "楊"
+    db = firestore.client()
+    collection_ref = db.collection("靜宜資管")    
+    docs = collection_ref.get()    
+    for doc in docs:
+        teacher = doc.to_dict()
+        if keyword in teacher["name"]:
+            Result += str(teacher) + "<br>"
+    if Result == "":
+        Result  = "抱歉，查無此關鍵字姓名枝老師資料"
+    return Result
+
 @app.route("/read")
 def read():
     Result = ""
