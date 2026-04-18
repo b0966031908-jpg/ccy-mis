@@ -36,7 +36,27 @@ def index():
     link += "<a href=/read>讀取Firestore資料</a><hr>"
     link += "<a href=/read2>讀取Firestore資料(根據姓名關鍵字)</a><hr>"
     link += "<a href=/spider>爬取子青老師本學期課程</a><hr>"
+    link += "<a href=/search>教師查詢</a><hr>"
     return link
+
+@app.route("/search", methods=["GET"])
+def searrch():
+    keyword = request.args.get("keyword", "")
+    results = [] 
+
+    if keyword:
+        db = firestore.client()  
+        teachers = db.collection("靜宜資管").stream()
+        for teacher in teachers:
+            data = teacher.to_dict()
+            if keyword in data.get("name", ""):
+                results.append(data)
+
+    return render_template("search.html", keyword=keyword, results=results)
+    
+if __name__ == "__main__":
+    app.run(debug=True)
+
 
 @app.route("/spider")
 def spider():

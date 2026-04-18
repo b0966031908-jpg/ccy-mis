@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>靜宜資管老師查詢</title>
+</head>
+<body>
+
+<h2>靜宜資管老師查詢</h2>
+
+<form method="get" action="/search">
+  請輸入老師姓名關鍵字：
+  <input type="text" name="keyword" value="">
+  <input type="submit" value="查詢">
+</form>
+
+<hr>
+
+{% if keyword %}
+  <b>查詢結果 (關鍵字: {{ keyword }}):</b>
+
+  {% if results %}
+    {% for teacher in results %}
+      <p>{{ teacher.name }} 老師的研究室在 <b>{{ teacher.lab }}</b></p>
+    {% endfor %}
+  {% else %}
+    <p>查無結果</p>
+  {% endif %}
+{% endif %}
+
+<br>
+<a href=/>返回個人首頁</a><br>
+
+</body>
+</html>
