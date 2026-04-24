@@ -42,18 +42,32 @@ def index():
 
 @app.route("/movie1")
 def movie1():
+    keyword = request.args.get("keyword", "")
+    
+    if not keyword:
+        return render_template("movie.html")  # 缺少縮排和return
+    
     R = ""
     url = "https://www.atmovies.com.tw/movie/next/"
     Data = requests.get(url)
     Data.encoding = "utf-8"
-    #print(Data.text)
     sp = BeautifulSoup(Data.text, "html.parser")
-    result=sp.select(".filmListAllX li")
+    result = sp.select(".filmListAllX li")
     for item in result:
-        R += item.find("img").get("alt") + "<br>"
-        R +="https://www.atmovies.com.tw" + item.find("a").get("href") + "<br>"
-        R +="https://www.atmovies.com.tw" + item.find("img").get("src") + "<br><br>"
-    return R
+        name = item.find("img").get("alt")
+        href = "https://www.atmovies.com.tw" + item.find("a").get("href")
+        src  = "https://www.atmovies.com.tw" + item.find("img").get("src")
+        if keyword in name:
+            R += f'<a href="{href}">{name}</a><br>'
+            R += f'<img src="{src}"><br><br>'
+    
+    if not R:
+        R = f"找不到包含「{keyword}」的電影<br><br>"
+    
+    return render_template("movie.html", result= R)
+
+if __name__ == "__main__":
+    app.run(debug=True)
 
 @app.route("/search", methods=["GET"])
 def searrch():
