@@ -37,9 +37,58 @@ def index():
     link += "<a href=/read2>讀取Firestore資料(根據姓名關鍵字)</a><hr>"
     link += "<a href=/spider>爬取子青老師本學期課程</a><hr>"
     link += "<a href=/search>教師查詢</a><hr>"
-    link += "<a href=/movie1>爬取即將上映電影</a><hr>"
+    link += "<a href=/movie1>查詢即將上映電影</a><hr>"
     link += "<a href=/spidermovie>爬取即將上映電影到資料庫</a><hr>"
+    link += "<a href=/searchMovie>從資料庫查詢即將上映電影</a><hr>"
     return link
+
+@app.route("/searchMovie")
+def searchMovie():
+    keyword = request.args.get("keyword", "").strip()
+    if not keyword:
+        return render_template("searchMovie.html")
+
+    db = firestore.client()
+    docs = db.collection("電影2B").stream()
+
+    results = []
+    for doc in docs:
+        data = doc.to_dict()
+        if keyword in data.get("title", ""):
+            results.append({
+                "id": doc.id,
+                "title": data.get("title", ""),
+                "picture": data.get("picture", ""),
+                "hyperlink": data.get("hyperlink", ""),
+                "showDate": data.get("showDate", ""),
+                "lastUpdate": data.get("lastUpdate", "")  # 新增
+            })
+
+    if not results:
+        return f"找不到包含「{keyword}」的電影。"
+
+    R = f"<h2>搜尋「{keyword}」共找到 {len(results)} 部電影</h2>"
+    R = f'''
+        <h1>查詢電影&nbsp;</h1>
+        <form action="/movie1" method="get">
+            <input type="text" name="keyword" placeholder="請輸入電影關鍵字">
+            <input type="submit" value="搜尋">
+        </form>
+        '''
+    for idx, movie in enumerate(results, start=1):
+        R += f"""
+        <div style="margin-bottom:20px; border-bottom:1px solid #ccc; padding-bottom:10px;">
+            <p><strong>編號：</strong>{idx}</p>
+            <p><strong>片名：</strong>{movie['title']}</p>
+            <img src="{movie['picture']}" alt="{movie['title']}" width="120"><br>
+            <p><strong>海報連結：</strong><a href="{movie['picture']}" target="_blank">{movie['picture']}</a></p>
+            <p><strong>上映日期：</strong>{movie['showDate']}</p>
+            <p><strong>最新更新日期：</strong>{movie['lastUpdate']}</p>
+            <p><a href="{movie['hyperlink']}" target="_blank">➜ 介紹頁</a></p><br>
+            <a href=/>返回個人首頁</a><br>
+        </div>
+        """
+    return R
 
 @app.route("/spidermovie")
 def spidermovie():
@@ -108,9 +157,6 @@ def movie1():
     except Exception as e:
         return f"錯誤原因：{str(e)}"
 
-if __name__ == "__main__":
-    app.run(debug=True)
-
 @app.route("/search", methods=["GET"])
 def searrch():
     keyword = request.args.get("keyword", "")
@@ -125,10 +171,6 @@ def searrch():
                 results.append(data)
 
     return render_template("search.html", keyword=keyword, results=results)
-    
-if __name__ == "__main__":
-    app.run(debug=True)
-
 
 @app.route("/spider")
 def spider():
