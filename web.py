@@ -40,7 +40,48 @@ def index():
     link += "<a href=/movie1>查詢即將上映電影</a><hr>"
     link += "<a href=/spidermovie>爬取即將上映電影到資料庫</a><hr>"
     link += "<a href=/searchMovie>從資料庫查詢即將上映電影</a><hr>"
+    link += "<a href=/road>台中市十大肇事路口</a><hr>"
+    link += "<a href=/weather>台灣各縣市天氣預報</a><hr>"
     return link
+
+import urllib3
+import requests, json
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+@app.route("/weather")
+def weather():
+    R = "<h1></h1>"
+    city = input()
+    city = city.replace("台","臺")
+
+    url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=rdec-key-123-45678-011121314&format=JSON&locationName=" + city
+    Data = requests.get(url)
+
+    JsonData = json.loads(Data.text)
+    R += JsonData["records"]["location"][0]["locationName"],"最新天氣預報"
+
+    Weather = json.loads(Data.text)["records"]["location"][0]["weatherElement"][0]["time"][0]["parameter"]["parameterName"]
+    Rain = json.loads(Data.text)["records"]["location"][0]["weatherElement"][1]["time"][0]["parameter"]["parameterName"]
+    R += Weather + "，降雨機率：" + Rain + "%"
+
+    return R
+
+@app.route("/road")
+def road():
+    R = "<h1>台中市十大肇事路口(113年10月)-楊承智做的</h1><br>"
+    url = "https://datacenter.taichung.gov.tw/swagger/OpenData/a1b899c0-511f-4e3d-b22b-814982a97e41"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+   
+    try:
+        Data = requests.get(url, headers=headers, timeout=10, verify=False)
+        JsonData = Data.json()
+    except Exception as e:
+        return f"<h1>抓取失敗</h1><p>{e}</p><pre>{Data.text[:500] if 'Data' in dir() else ''}</pre>"
+   
+    for item in JsonData:
+        R += f"{item['路口名稱']} 原因:{item['主要肇因']} 共 {item['總件數']} 件<br>"
+    return R
 
 @app.route("/searchMovie")
 def searchMovie():
