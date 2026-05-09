@@ -2,7 +2,7 @@ import math
 import os
 import json
 
-from flask import Flask, render_template,request
+from flask import Flask, render_template, request
 from datetime import datetime
 
 import firebase_admin
@@ -11,12 +11,13 @@ from firebase_admin import credentials, firestore
 import requests
 from bs4 import BeautifulSoup
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 # 判斷是在 Vercel 還是本地
 if os.path.exists('serviceAccountKey.json'):
-    # 本地環境：讀取檔案
     cred = credentials.Certificate('serviceAccountKey.json')
 else:
-    # 雲端環境：從環境變數讀取 JSON 字串
     firebase_config = os.getenv('FIREBASE_CONFIG')
     cred_dict = json.loads(firebase_config)
     cred = credentials.Certificate(cred_dict)
@@ -44,41 +45,60 @@ def index():
     link += "<a href=/weather>台灣各縣市天氣預報</a><hr>"
     return link
 
-import urllib3
-import requests, json
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# ── Bug 1 修正：移除重複的 index()，改用 render_template 引用 weather.html ──
 
 @app.route("/weather")
 def weather():
-    R = "<h1></h1>"
-    city = input()
-    city = city.replace("台","臺")
+    city = request.args.get("city", "").strip()
+    city = city.replace("台", "臺")
 
-    url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=rdec-key-123-45678-011121314&format=JSON&locationName=" + city
-    Data = requests.get(url)
+    if not city:
+        return render_template("weather.html", city="", weather=None, rain=None, location=None, error=None)
 
-    JsonData = json.loads(Data.text)
-    R += JsonData["records"]["location"][0]["locationName"],"最新天氣預報"
+    url = (
+        "https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001"
+        "?Authorization=rdec-key-123-45678-011121314"
+        "&format=JSON"
+        "&locationName=" + city
+    )
 
-    Weather = json.loads(Data.text)["records"]["location"][0]["weatherElement"][0]["time"][0]["parameter"]["parameterName"]
-    Rain = json.loads(Data.text)["records"]["location"][0]["weatherElement"][1]["time"][0]["parameter"]["parameterName"]
-    R += Weather + "，降雨機率：" + Rain + "%"
+    try:
+        Data = requests.get(url, timeout=10, verify=False)
+        JsonData = json.loads(Data.text)
+        location_data = JsonData["records"]["location"][0]
 
-    return R
+        location = location_data["locationName"]
+        weather_val = location_data["weatherElement"][0]["time"][0]["parameter"]["parameterName"]
+        rain = location_data["weatherElement"][1]["time"][0]["parameter"]["parameterName"]
+
+        return render_template(
+            "weather.html",
+            city=city,
+            location=location,
+            weather=weather_val,
+            rain=rain,
+            error=None
+        )
+
+    except (KeyError, IndexError):
+        return render_template("weather.html", city=city, weather=None, rain=None, location=None, error="找不到該縣市，請確認名稱是否正確（例如：臺北市、高雄市）")
+    except Exception as e:
+        return render_template("weather.html", city=city, weather=None, rain=None, location=None, error=f"查詢失敗：{str(e)}")
+
+# ── Bug 2 修正：以下 route 全部移到 if __name__ 之前 ──
 
 @app.route("/road")
 def road():
     R = "<h1>台中市十大肇事路口(113年10月)-楊承智做的</h1><br>"
     url = "https://datacenter.taichung.gov.tw/swagger/OpenData/a1b899c0-511f-4e3d-b22b-814982a97e41"
     headers = {'User-Agent': 'Mozilla/5.0'}
-   
+
     try:
         Data = requests.get(url, headers=headers, timeout=10, verify=False)
         JsonData = Data.json()
     except Exception as e:
         return f"<h1>抓取失敗</h1><p>{e}</p><pre>{Data.text[:500] if 'Data' in dir() else ''}</pre>"
-   
+
     for item in JsonData:
         R += f"{item['路口名稱']} 原因:{item['主要肇因']} 共 {item['總件數']} 件<br>"
     return R
@@ -102,13 +122,12 @@ def searchMovie():
                 "picture": data.get("picture", ""),
                 "hyperlink": data.get("hyperlink", ""),
                 "showDate": data.get("showDate", ""),
-                "lastUpdate": data.get("lastUpdate", "")  # 新增
+                "lastUpdate": data.get("lastUpdate", "")
             })
 
     if not results:
         return f"找不到包含「{keyword}」的電影。"
 
-    R = f"<h2>搜尋「{keyword}」共找到 {len(results)} 部電影</h2>"
     R = f'''
         <h1>查詢電影&nbsp;</h1>
         <form action="/movie1" method="get">
@@ -141,40 +160,39 @@ def spidermovie():
     Data.encoding = "utf-8"
 
     sp = BeautifulSoup(Data.text, "html.parser")
-    lastUpdate = sp.find(class_ = "grey").text.replace("更新時間：", "")
+    lastUpdate = sp.find(class_="grey").text.replace("更新時間：", "")
 
-    result=sp.select(".filmListAllX li")
-    info = ""
+    result = sp.select(".filmListAllX li")
     total = 0
     for item in result:
-      total += 1
-      movie_id = item.find("a").get("href").replace("/movie/", "").replace("/", "")
-      tittle = item.find(class_="filmtitle").text
-      picture = "https://www.atmovies.com.tw/" + item.find("img").get("src")
-      hyperlink = "https://www.atmovies.com.tw/" + item.find("a").get("href")
-      showDate = item.find(class_="runtime").text[0:15]
+        total += 1
+        movie_id = item.find("a").get("href").replace("/movie/", "").replace("/", "")
+        tittle = item.find(class_="filmtitle").text
+        picture = "https://www.atmovies.com.tw/" + item.find("img").get("src")
+        hyperlink = "https://www.atmovies.com.tw/" + item.find("a").get("href")
+        showDate = item.find(class_="runtime").text[0:15]
 
-      doc = {
-          "title": tittle,
-          "picture": picture,
-          "hyperlink": hyperlink,
-          "showDate": showDate,
-          "lastUpdate": lastUpdate
-      }
+        doc = {
+            "title": tittle,
+            "picture": picture,
+            "hyperlink": hyperlink,
+            "showDate": showDate,
+            "lastUpdate": lastUpdate
+        }
 
-      doc_ref = db.collection("電影2B").document(movie_id)
-      doc_ref.set(doc)
+        doc_ref = db.collection("電影2B").document(movie_id)
+        doc_ref.set(doc)
     R += "更新日期:" + lastUpdate + '<br>'
-    R += "總共爬取" + str(total) + "部電影" +'<br>'
+    R += "總共爬取" + str(total) + "部電影" + '<br>'
     return R
 
 @app.route("/movie1")
 def movie1():
     keyword = request.args.get("keyword", "")
-    
+
     if not keyword:
         return render_template("movie.html")
-    
+
     try:
         R = ""
         url = "https://www.atmovies.com.tw/movie/next/"
@@ -189,22 +207,22 @@ def movie1():
             if keyword in name:
                 R += f'<a href="{href}">{name}</a><br>'
                 R += f'<img src="{src}"><br><br>'
-        
+
         if not R:
             R = f"找不到包含「{keyword}」的電影<br><br>"
-        
+
         return render_template("movie.html", result=R, keyword=keyword)
-    
+
     except Exception as e:
         return f"錯誤原因：{str(e)}"
 
 @app.route("/search", methods=["GET"])
 def searrch():
     keyword = request.args.get("keyword", "")
-    results = [] 
+    results = []
 
     if keyword:
-        db = firestore.client()  
+        db = firestore.client()
         teachers = db.collection("靜宜資管").stream()
         for teacher in teachers:
             data = teacher.to_dict()
@@ -220,7 +238,7 @@ def spider():
     Data = requests.get(url, verify=False)
     Data.encoding = "utf-8"
     sp = BeautifulSoup(Data.text, "html.parser")
-    result=sp.select(".team-box a")
+    result = sp.select(".team-box a")
     for i in result:
         R += i.text + i.get("href") + "<br>"
     return R
@@ -230,24 +248,24 @@ def read2():
     Result = ""
     keyword = "楊"
     db = firestore.client()
-    collection_ref = db.collection("靜宜資管")    
-    docs = collection_ref.get()    
+    collection_ref = db.collection("靜宜資管")
+    docs = collection_ref.get()
     for doc in docs:
         teacher = doc.to_dict()
         if keyword in teacher["name"]:
             Result += str(teacher) + "<br>"
     if Result == "":
-        Result  = "抱歉，查無此關鍵字姓名枝老師資料"
+        Result = "抱歉，查無此關鍵字姓名枝老師資料"
     return Result
 
 @app.route("/read")
 def read():
     Result = ""
     db = firestore.client()
-    collection_ref = db.collection("靜宜資管")    
-    docs = collection_ref.get()    
-    for doc in docs:         
-        Result += str(doc.to_dict()) + "<br>"    
+    collection_ref = db.collection("靜宜資管")
+    docs = collection_ref.get()
+    for doc in docs:
+        Result += str(doc.to_dict()) + "<br>"
     return Result
 
 @app.route("/mis")
@@ -257,25 +275,25 @@ def course():
 @app.route("/today")
 def today():
     now = datetime.now()
-    return render_template("today.html", datetime = str(now))
+    return render_template("today.html", datetime=str(now))
 
 @app.route("/cy")
 def cy():
     return render_template("about.html")
 
-@app.route("/wc", methods = ["Get"])
+@app.route("/wc", methods=["Get"])
 def wc():
     user = request.values.get("u")
     d = request.values.get("d")
     c = request.values.get("c")
-    return render_template("welcome.html", name = user, dep = d, course = c)
+    return render_template("welcome.html", name=user, dep=d, course=c)
 
 @app.route("/account", methods=["GET", "POST"])
 def account():
     if request.method == "POST":
         user = request.form["user"]
         pwd = request.form["pwd"]
-        result = "您輸入的帳號是：" + user + "; 密碼為：" + pwd 
+        result = "您輸入的帳號是：" + user + "; 密碼為：" + pwd
         return result
     else:
         return render_template("account.html")
@@ -294,8 +312,9 @@ def calc():
                 ans = "他媽數學白癡,y不能為0"
             else:
                 ans = x ** (1/y)
-        return render_template("calculate.html", result = ans)
+        return render_template("calculate.html", result=ans)
     else:
-        return render_template("calculate.html", result = None)
+        return render_template("calculate.html", result=None)
+
 if __name__ == "__main__":
     app.run(debug=True)
