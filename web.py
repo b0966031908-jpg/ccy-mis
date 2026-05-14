@@ -60,15 +60,18 @@ def webhook():
         info = "我是楊承智開發的電影聊天機器人,您選擇的電影分級是：" + rate
 
     db = firestore.client()
-        collection_ref = db.collection("電影含分級")
-        docs = collection_ref.get()
-        result = ""
-        for doc in docs:
-            dict = doc.to_dict()
-            if rate in dict["rate"]:
-                result += "片名：" + dict["title"] + "\n"
-                result += "介紹：" + dict["hyperlink"] + "\n\n"
-        info += result
+    collection_ref = db.collection("本週新片含分級")
+    docs = collection_ref.get()
+    result = ""
+    for doc in docs:
+        data = doc.to_dict()
+        if rate in data.get("rate", ""):
+            result += "片名：" + data["title"] + "\n"
+            result += "介紹：" + data["hyperlink"] + "\n\n"
+
+        info += "\n" + result if result else "\n（查無符合分級的電影）"
+    else:
+        info = "無法識別的動作：" + action
 
     return make_response(jsonify({"fulfillmentText": info}))
 
