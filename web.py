@@ -44,6 +44,7 @@ def index():
     link += "<a href=/road>台中市十大肇事路口</a><hr>"
     link += "<a href=/weather>台灣各縣市天氣預報</a><hr>"
     link += "<a href=/rate>爬取本周新片含分級</a><hr>"
+    link += "<a href=/webDemo>聊天機器人</a><hr>"
     return link
 
 @app.route("/webhook", methods=["POST"])
@@ -57,7 +58,7 @@ def webhook():
 
     if (action == "rateChoice"):
         rate = req["queryResult"]["parameters"]["rate"]
-        info = "我是楊承智開發的電影聊天機器人,您選擇的電影分級是：" + rate
+        info = "我是楊承智開發的電影聊天機器人,您選擇的電影分級是：" + rate + "。<br>"
         db = firestore.client()
         collection_ref = db.collection("本週新片含分級")
         docs = collection_ref.get()
@@ -367,6 +368,10 @@ def today():
 @app.route("/cy")
 def cy():
     return render_template("about.html")
+
+@app.route("/webDemo")
+def webDemo():
+    return render_template("webDemo.html")
 
 @app.route("/wc", methods=["Get"])
 def wc():
